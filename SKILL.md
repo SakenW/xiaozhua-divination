@@ -8,7 +8,7 @@ description: >
 
 # 🐾 小爪命理屋
 
-> 整合东西方命理，排盘靠脚本不靠猜。
+> 小爪的算命技能，整合东西方命理，排盘靠脚本不靠猜。
 
 ## 八大体系
 
@@ -50,29 +50,28 @@ description: >
 ```
 xiaozhua-divination/
 ├── SKILL.md                  ← 主入口（当前文件）
-├── README.md                 ← 项目说明
-├── requirements.txt          ← Python 依赖（lunar_python, tzdata）
 ├── scripts/
-│   ├── run_ziwei.py          ← 紫微排盘 wrapper（自动管理 venv）
+│   ├── run_ziwei.py          ← 紫微排盘 wrapper
 │   ├── run_qimen.py          ← 奇门排盘 wrapper
-│   └── run_liuyao.py         ← 六爻排盘 wrapper
+│   ├── run_liuyao.py         ← 六爻排盘 wrapper
+│   └── .venv/                ← Python 统一依赖
 │
 ├── liuyao/                   ← 六爻问卦
 │   ├── SKILL.md              ← 解读规则
 │   ├── time-casting.md       ← 时间起卦+六爻断卦
 │   └── scripts/
-│       └── liuyao_pan.py     ← 排盘脚本
+│       └── liuyao_pan.py     ← 排盘脚本（31KB，天工长老）
 │
 ├── qimen-dunjia/             ← 奇门遁甲
 │   ├── SKILL.md
 │   ├── scripts/
-│   │   └── qimen_cli.py      ← 排盘脚本
+│   │   └── qimen_cli.py      ← 排盘脚本（20KB，FANzR-arch）
 │   └── references/
 │
 ├── ziwei-doushu/             ← 紫微斗数
 │   ├── SKILL.md
 │   ├── scripts/
-│   │   └── ziwei_chart.py    ← 排盘脚本
+│   │   └── ziwei_chart.py    ← 排盘脚本（40KB，spyfree）
 │   └── references/
 │
 ├── bazi/                     ← 八字四柱（LLM 解读）
@@ -184,29 +183,36 @@ LLM 解读为主。
 本技能整合了多位作者的工作，按子技能分类：
 
 ### 紫微斗数
-- **排盘脚本** (`ziwei_chart.py`)：[spyfree](https://clawhub.com) — clawhub `ziwei-doushu` v1.0.2
-- **解读参考**：[mingkunyuan/divination-skills](https://github.com/mingkunyuan/divination-skills) — 排盘规则、星曜、四化、格局
+- **排盘脚本** (`ziwei_chart.py`, 40KB)：[spyfree](https://clawhub.com) — clawhub `ziwei-doushu` v1.0.2
+- **SKILL.md + 排盘规则 + 星曜 + 四化 + 格局**：[FANzR-arch/Numerologist_skills](https://github.com/FANzR-arch/Numerologist_skills) — 含详细追问流程、三方四正表、庙旺陷表、飞星进阶
 - **解读框架**：spyfree — interpretation-framework.md、mapping.md
 
 ### 奇门遁甲
-- **排盘脚本** (`qimen_cli.py`)：[FANzR-arch/Numerologist_skills](https://github.com/FANzR-arch/Numerologist_skills)
+- **排盘脚本** (`qimen_cli.py`, 20KB)：[FANzR-arch/Numerologist_skills](https://github.com/FANzR-arch/Numerologist_skills)
 - **解读参考**：FANzR-arch — 用神、格局、访谈流程、规则集
-- **解读指南 + 计算规则**：[eamanc-lab](https://clawhub.com) — clawhub `qimen-dunjia-oracle` v1.0.0
+- **解读指南 + 计算规则**：[eamanc-lab](https://clawhub.com) — clawhub `qimen-dunjia-oracle` v1.0.0 — 九星八门八神详解、常见格局、方位吉凶规则、输出格式模板
 - **SKILL.md 框架**：mingkunyuan/divination-skills
 
 ### 六爻问卦
-- **排盘脚本** (`liuyao_pan.py`)：[天工长老 (dglijin-oss)](https://clawhub.com) — clawhub `liuyao-najia-skill` v3.0.1
+- **排盘脚本** (`liuyao_pan.py`, 31KB)：[天工长老 (dglijin-oss)](https://clawhub.com) — clawhub `liuyao-najia-skill` v3.0.1
 - **解读参考**：[eamanc-lab](https://clawhub.com) — clawhub `liuyao-yijing` v1.0.0 — 计算规则 + 解读指南
 - **时间起卦法**：mingkunyuan/divination-skills — time-casting.md
 
 ### 八字四柱
-- **SKILL.md + 计算规则 + 解读指南**：[eamanc-lab](https://clawhub.com) — clawhub `bazi-fortune` v1.0.0（子平真诠体系）
+- **SKILL.md + 天干地支参考 + 提示词模板**：[FANzR-arch/Numerologist_skills](https://github.com/FANzR-arch/Numerologist_skills)
+- **计算规则 + 解读指南**：[eamanc-lab](https://clawhub.com) — clawhub `bazi-fortune` v1.0.0（子平真诠体系）
 
 ### 塔罗牌
 - **SKILL.md + 大牌 + 小牌 + 牌阵 + 解读规则**：[eamanc-lab](https://clawhub.com) — clawhub `tarot-reading` v1.2.0（Rider-Waite-Smith 体系，中英双语）
 
 ### 占星学 / 九型人格 / MBTI
 - **SKILL.md**：[clider0915/divination-skills](https://github.com/clider0915/divination-skills) v2.0
+
+### eamanc-lab 其他技能（未使用）
+- `qimen-dunjia-oracle`（参考文档已合并，排盘用 FANzR-arch 脚本版）
+
+---
+*整理时间：2026-04-28*
 
 ## 统一免责声明
 

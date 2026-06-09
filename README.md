@@ -2,69 +2,13 @@
 
 > **8 大体系 · 3 脚本排盘 · 排盘靠计算不靠猜**
 
-整合中华传统术数（紫微斗数、奇门遁甲、六爻问卦、八字四柱）与西方体系（塔罗、占星、九型人格、MBTI），共 8 种命理与性格分析方法。
+---
 
-三个中华术数体系配备**确定性排盘脚本**——排盘结果由程序计算而非 LLM 猜测，确保准确性和一致性。
+## 是什么
 
-## ✨ 特点
+小爪命理屋是一个综合命理与性格分析技能，整合了中华传统术数与西方性格分析两大体系共 **8 种方法**。其中紫微斗数、奇门遁甲、六爻问卦配备确定性排盘脚本，排盘结果由程序计算而非 LLM 猜测，确保准度和一致性。
 
-- 🧮 **脚本排盘**：紫微斗数、奇门遁甲、六爻问卦均有 Python 排盘脚本，零依赖 LLM 心算
-- 🔄 **智能路由**：根据问题类型自动推荐最合适的方法
-- 📚 **多源整合**：每个体系整合了多个优质来源的排盘规则和解读框架
-- 🤖 **AI Agent 友好**：设计为 AI Agent 的技能插件，可被 OpenClaw 等 Agent 框架直接调用
-
-## 📦 安装
-
-### 前置条件
-
-- Python 3.11+
-- pip
-
-### 快速开始
-
-```bash
-# 克隆仓库
-git clone https://github.com/SakenW/xiaozhua-divination.git
-cd xiaozhua-divination
-
-# 安装依赖（首次运行 wrapper 时也会自动安装）
-pip install -r requirements.txt
-```
-
-或者什么都不做——**wrapper 脚本首次运行时会自动创建 venv 并安装依赖**。
-
-## 🎯 使用
-
-### 紫微斗数排盘
-```bash
-python3 scripts/run_ziwei.py --date 1983-04-29 --time 11:05 --gender male --format markdown
-```
-
-### 奇门遁甲排盘
-```bash
-# 先准备输入 JSON
-echo '{"question_type":"事业","time_input":"2026-06-09 10:00","calendar_type":"solar","location":{"country":"China","timezone":"Asia/Shanghai"},"ruleset":"mainline-cn-v1"}' > /tmp/qi_in.json
-
-# 运行排盘
-python3 scripts/run_qimen.py --input /tmp/qi_in.json --output /tmp/qi_out.json
-
-# 查看结果
-cat /tmp/qi_out.json
-```
-
-### 六爻问卦
-```bash
-# 时间起卦
-python3 scripts/run_liuyao.py --date "2026-06-09 10:00" --question "事业"
-
-# 铜钱起卦（6次摇出的背面数，0-3）
-python3 scripts/run_liuyao.py --coins "1,2,3,1,2,3" --question "财运"
-
-# 数字起卦
-python3 scripts/run_liuyao.py --numbers "3,5,7,2,8,9"
-```
-
-## 🗂️ 8 大体系一览
+## 8 大体系一览
 
 | 体系 | 来源 | 排盘方式 | 适用场景 |
 |------|------|----------|----------|
@@ -77,44 +21,127 @@ python3 scripts/run_liuyao.py --numbers "3,5,7,2,8,9"
 | 🔢 **九型人格** | 西方 | LLM 解读 | 动机分析、个人成长、关系模式 |
 | 🧠 **MBTI** | 西方 | LLM 解读 | 认知功能、职业匹配、团队建设 |
 
-## 📁 项目结构
+## 核心特点
+
+### ⚙️ 脚本排盘，不靠猜
+
+三个中华术数体系配备专业排盘脚本，输入出生信息或时间后由程序确定性计算：
+
+- **紫微斗数**：40KB 排盘引擎，支持双引擎交叉校验（py/js），输出命宫、十二宫、四化、大限流年等完整盘面
+- **奇门遁甲**：20KB 排盘脚本，时家转盘奇门，阳遁阴遁自动判定，输出九宫四层盘面（天地人神）
+- **六爻问卦**：31KB 排盘脚本，支持铜钱起卦、数字起卦、时间起卦，自动纳甲装卦、六亲六神排布
+
+### 🔄 智能路由
+
+根据问题类型自动选择最合适的方法：
+
+- "这件事能不能成" → 六爻 / 奇门
+- "我想看自己的命盘" → 紫微斗数
+- "今天适合去哪个方向" → 奇门遁甲
+- "帮我抽个塔罗" → 塔罗牌
+- "我是什么性格" → 九型 / MBTI
+
+也可以直接指定方法。
+
+### 📚 多源整合
+
+每个体系都整合了多个优质来源的参考文档，确保排盘规则和解读框架的专业性。
+
+## 技术架构
 
 ```
 xiaozhua-divination/
-├── SKILL.md                  ← 统一入口，方法路由规则
-├── scripts/                  ← 排盘 wrapper + 自动 venv 管理
-├── ziwei-doushu/             ← 紫微斗数（排盘脚本 + 参考文档）
-├── qimen-dunjia/             ← 奇门遁甲（排盘脚本 + 参考文档）
-├── liuyao/                   ← 六爻问卦（排盘脚本 + 参考文档）
-├── bazi/                     ← 八字四柱（参考文档）
-├── tarot/                    ← 塔罗牌（参考文档）
-├── astrology/                ← 占星学
-├── enneagram/                ← 九型人格
-└── mbti/                     ← MBTI
+├── SKILL.md                          ← 统一入口，智能路由
+├── scripts/
+│   ├── run_ziwei.py                  ← 紫微排盘 wrapper
+│   ├── run_qimen.py                  ← 奇门排盘 wrapper
+│   ├── run_liuyao.py                 ← 六爻排盘 wrapper
+│   └── .venv/                        ← 统一 Python 依赖
+│
+├── ziwei-doushu/                     ← 紫微斗数
+│   ├── SKILL.md
+│   ├── scripts/ziwei_chart.py        ← 40KB 排盘引擎
+│   └── references/                   ← 排盘规则、星曜、四化、格局、解读框架
+│
+├── qimen-dunjia/                     ← 奇门遁甲
+│   ├── SKILL.md
+│   ├── scripts/qimen_cli.py          ← 20KB 排盘脚本
+│   └── references/                   ← 用神、格局、解读指南、计算规则、输出模板
+│
+├── liuyao/                           ← 六爻问卦
+│   ├── SKILL.md
+│   ├── scripts/liuyao_pan.py         ← 31KB 排盘脚本
+│   ├── time-casting.md               ← 时间起卦法
+│   └── references/                   ← 计算规则、解读指南
+│
+├── bazi/                             ← 八字四柱
+│   ├── SKILL.md
+│   └── references/                   ← 计算规则、解读指南（子平真诠体系）
+│
+├── tarot/                            ← 塔罗牌
+│   ├── SKILL.md
+│   └── references/                   ← 大牌、小牌、牌阵系统、解读规则
+│
+├── astrology/                        ← 西方占星学
+│   └── SKILL.md
+│
+├── enneagram/                        ← 九型人格
+│   └── SKILL.md
+│
+└── mbti/                             ← MBTI
+    └── SKILL.md
 ```
 
-每个子目录的 `SKILL.md` 包含该体系的详细使用规则、触发词和解读框架。
+## 使用示例
 
-## 🙏 致谢
+### 紫微斗数
+```
+用户：帮我排个紫微命盘，我 1983 年 4 月 29 日 11:05 出生，男
+→ 调用排盘脚本，输出完整命盘 + 十二宫 + 四化 + 大限流年 + 解读
+```
+
+### 奇门遁甲
+```
+用户：用奇门看看今天适合去哪个方向谈合作
+→ 调用排盘脚本，输出九宫盘面 + 方位吉凶 + 行动建议
+```
+
+### 六爻问卦
+```
+用户：帮我起个卦看看这次面试能不能过
+→ 调用排盘脚本，纳甲装卦 + 断卦分析 + 吉凶评分
+```
+
+### 八字四柱
+```
+用户：看看我的八字，1990 年 10 月 21 日下午 3 点半，女
+→ 排四柱 + 十神 + 五行旺衰 + 格局 + 大运流年
+```
+
+### 塔罗牌
+```
+用户：帮我抽个塔罗，最近事业方向
+→ 选牌阵 + 抽牌 + 解读（大牌小牌 + 正位逆位）
+```
+
+## 致谢与来源
 
 本技能整合了多位作者的心血：
 
-| 子技能 | 排盘脚本来源 | 解读参考来源 |
-|--------|------------|------------|
-| 紫微斗数 | [spyfree](https://clawhub.com) | spyfree + [mingkunyuan](https://github.com/mingkunyuan/divination-skills) |
-| 奇门遁甲 | [FANzR-arch](https://github.com/FANzR-arch/Numerologist_skills) | FANzR-arch + [eamanc-lab](https://clawhub.com) + mingkunyuan |
+| 子技能 | 排盘脚本 | 解读参考 |
+|--------|----------|----------|
+| 紫微斗数 | [spyfree](https://clawhub.com) | spyfree + mingkunyuan |
+| 奇门遁甲 | [FANzR-arch](https://github.com/FANzR-arch/Numerologist_skills) | FANzR-arch + eamanc-lab + mingkunyuan |
 | 六爻问卦 | [天工长老](https://clawhub.com) | eamanc-lab + mingkunyuan |
 | 八字四柱 | — | eamanc-lab |
 | 塔罗牌 | — | eamanc-lab |
-| 占星/九型/MBTI | — | [clider0915](https://github.com/clider0915/divination-skills) |
+| 占星/九型/MBTI | — | clider0915 |
 
-## ⚠️ 免责声明
+详细来源清单见 `SKILL.md` 致谢章节。
+
+## 免责声明
 
 > 传统术数属于中华文化遗产，塔罗占星属于西方文化传统，本次解读均用于辅助观察与思考，不代替医疗、法律、财务等专业意见。涉及重大决策时，请同时结合现实信息理性判断。
-
-## 📄 License
-
-MIT
 
 ---
 
