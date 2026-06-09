@@ -14,8 +14,9 @@ description: >
 
 Read:
 
+- `references/calculation-rules.md`
+- `references/interpretation-guide.md`
 - `references/prompt-template.md`
-- `references/tiangan-dizhi.md`
 
 ## 核心规则
 
