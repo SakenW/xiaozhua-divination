@@ -494,7 +494,7 @@ def build_output(payload: dict[str, Any]) -> dict[str, Any]:
             "name": "时家转盘奇门（大陆默认）",
             "timezone_default": DEFAULT_TIMEZONE,
             "dun_type_rule": "冬至到芒种用阳遁，夏至到大雪用阴遁，按当前节令判定。",
-            "yuan_rule": "按日干支所在六十甲子序列，每 5 日一元，循环上元/中元/下元。",
+            "yuan_rule": "符头定元法：按日柱所在六甲旬的旬首（甲X）地支属性判定整个旬的元归属——四仲符头（甲子/甲午）→上元，四孟符头（甲申/甲寅）→中元，四季符头（甲戌/甲辰）→下元。一个六甲旬（10日）内所有日期归同一元。",
             "ju_rule": "按当前节令和三元，从固定定局表取局数。",
             "center_hosting_rule": "中宫相关判断一律寄坤处理。",
         },

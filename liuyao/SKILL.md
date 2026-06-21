@@ -17,7 +17,7 @@ Read（装卦与断卦前必须加载）：
 
 - `references/calculation-rules.md`：八卦基础表、纳甲装天干、纳支装地支、八宫归属、世应规则、六亲六神、月建旺衰、六冲六合——所有确定性查表规则的事实源
 - `references/interpretation-guide.md`：用神选取、断卦步骤、动爻判断、应期判断、断卦模板
-- `time-casting.md`：时间起卦（梅花易数）规则
+- `references/time-casting.md`：时间起卦（梅花易数）规则
 
 ## 核心原则
 
@@ -91,7 +91,7 @@ Read（装卦与断卦前必须加载）：
 - ✅ 动爻单一，判断更清晰
 - ⚠️ 复杂问题仍建议用传统六爻
 
-**详细说明**：查看 `time-casting.md`
+**详细说明**：查看 `references/time-casting.md`
 
 #### 如何选择？
 

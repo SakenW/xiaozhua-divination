@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-六爻纳甲排盘工具 v2.0.0
+六爻纳甲排盘工具（仓库版本见根目录 VERSION 文件）
 天工长老开发
 
 功能：六爻起卦、纳甲、装卦、六亲、世应、六神排布、动爻变卦、自动化断卦
@@ -1197,7 +1197,7 @@ def format_output(result: Dict) -> str:
 
 
 def main():
-    parser = argparse.ArgumentParser(description='六爻纳甲排盘工具 v3.0.0')
+    parser = argparse.ArgumentParser(description='六爻纳甲排盘工具')
     parser.add_argument('--date', '-d', type=str, help='日期时间 (YYYY-MM-DD HH:MM)')
     parser.add_argument('--numbers', '-n', type=str, help='数字起卦 (逗号分隔)')
     parser.add_argument('--coins', '-c', type=str, help='铜钱起卦 (6 次正面数/字面数 0-3，逗号分隔)')
