@@ -1,11 +1,12 @@
-#!/opt/homebrew/bin/python3
-"""Wrapper: run liuyao_pan.py with venv packages available."""
+#!/usr/bin/env python3
+"""Run liuyao_pan.py with bundled dependencies when present."""
 import sys
+from pathlib import Path
 
-SKILLS_DIR = "/Users/saken/.openclaw/workspace/skills/xiaozhua-divination"
-venv_site = f"{SKILLS_DIR}/scripts/.venv/lib/python3.14/site-packages"
-sys.path.insert(0, venv_site)
-sys.path.insert(0, f"{SKILLS_DIR}/liuyao/scripts")
+SKILL_DIR = Path(__file__).resolve().parents[1]
+for site_packages in sorted((SKILL_DIR / "scripts" / ".venv" / "lib").glob("python*/site-packages")):
+    sys.path.insert(0, str(site_packages))
+sys.path.insert(0, str(SKILL_DIR / "liuyao" / "scripts"))
 
 from liuyao_pan import main
 main()

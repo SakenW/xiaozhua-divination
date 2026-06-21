@@ -21,3 +21,14 @@ env/
 # Temp files
 *.tmp
 *.bak
+*.log
+.env
+
+# Python caches
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+*.egg-info/
+
+# Build output
+dist/
