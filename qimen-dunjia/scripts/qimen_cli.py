@@ -279,16 +279,39 @@ def build_solar_and_lunar(normalized: NormalizedInput) -> tuple[Solar, Any]:
 
 
 def active_jie(lunar: Any) -> tuple[str, Any, Any]:
-    prev_jie = lunar.getPrevJie(False)
-    next_jie = lunar.getNextJie(False)
+    # 奇门定局需要 24 节气中的"节"与"气"共同参与（每节气对应一局）。
+    # lunar_python 的 getPrevJie/getNextJie 只返回 12 节，
+    # 会丢失另外 12 气（如春分、谷雨、小满），导致约一半日期定错阴阳/元/局。
+    # 必须改用 getPrevJieQi/getNextJieQi 拿到完整的 24 节气。
+    prev_jie = lunar.getPrevJieQi(False)
+    next_jie = lunar.getNextJieQi(False)
     if prev_jie is None:
         raise ValueError("无法确定当前节令")
     return prev_jie.getName(), prev_jie, next_jie
 
 
 def compute_yuan(day_ganzhi: str) -> str:
+    """按"符头法"判定三元（标准奇门定元规则）。
+
+    每个节气分上中下三元，每元5日；元由日柱所在"六甲旬"的旬首属性决定：
+    - 四仲符头（甲子、甲午） → 上元
+    - 四孟符头（甲申、甲寅） → 中元
+    - 四季符头（甲戌、甲辰） → 下元
+
+    注意：旧实现用 `idx // 5 % 3`，对每旬首日（甲X）正确，但对每旬第6~10日
+    （癸X 等）会算错——例如癸酉（甲子旬）应为上元，旧算法返回中元。
+    """
     idx = JIAZI.index(day_ganzhi)
-    return ["上元", "中元", "下元"][(idx // 5) % 3]
+    xunshou_idx = (idx // 10) * 10  # 0/10/20/30/40/50，对应六甲旬首
+    xunshou_to_yuan = {
+        0: "上元",   # 甲子（子=四仲）
+        10: "下元",  # 甲戌（戌=四季）
+        20: "中元",  # 甲申（申=四孟）
+        30: "上元",  # 甲午（午=四仲）
+        40: "下元",  # 甲辰（辰=四季）
+        50: "中元",  # 甲寅（寅=四孟）
+    }
+    return xunshou_to_yuan[xunshou_idx]
 
 
 def compute_earth_plate(dun_type: str, ju_number: int) -> dict[int, str]:

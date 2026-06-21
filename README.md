@@ -52,11 +52,13 @@
 ```
 xiaozhua-divination/
 ├── SKILL.md                          ← 统一入口，智能路由
+├── requirements.txt                  ← Python 依赖
 ├── scripts/
 │   ├── run_ziwei.py                  ← 紫微排盘 wrapper
 │   ├── run_qimen.py                  ← 奇门排盘 wrapper
 │   ├── run_liuyao.py                 ← 六爻排盘 wrapper
-│   └── .venv/                        ← 统一 Python 依赖
+├── tools/
+│   └── build_skill.py                ← 生成干净成品目录
 │
 ├── ziwei-doushu/                     ← 紫微斗数
 │   ├── SKILL.md
@@ -91,6 +93,25 @@ xiaozhua-divination/
 └── mbti/                             ← MBTI
     └── SKILL.md
 ```
+
+## 开发与成品目录
+
+本仓库根目录是开发仓库，可以保留 `README.md`、`LICENSE`、`.gitignore`、`tools/` 等维护文件。
+
+实际安装给 Codex/OpenClaw/Claude 使用时，建议生成干净成品目录：
+
+```bash
+python3 tools/build_skill.py
+```
+
+默认输出：
+
+```text
+dist/xiaozhua-divination/
+dist/xiaozhua-divination.zip
+```
+
+成品目录只包含 agent 运行需要的文件：`SKILL.md`、`requirements.txt`、`scripts/`、各子技能目录及其 `references/`/`scripts/`。不会包含 `.git/`、`.venv/`、`README.md`、`LICENSE`、缓存文件、测试文件或开发工具。
 
 ## 使用示例
 
@@ -137,7 +158,7 @@ xiaozhua-divination/
 | 塔罗牌 | — | eamanc-lab |
 | 占星/九型/MBTI | — | clider0915 |
 
-详细来源清单见 `SKILL.md` 致谢章节。
+更详细的来源信息保留在各子技能与参考文件中。
 
 ## 免责声明
 

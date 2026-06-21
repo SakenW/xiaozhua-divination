@@ -4,6 +4,7 @@ from __future__ import annotations
 import argparse
 import io
 import json
+import subprocess
 from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Any
@@ -184,7 +185,20 @@ def parse_local_datetime(date_text: str, time_text: str, timezone_name: str) -> 
 
 
 def apply_longitude(local_dt: datetime, longitude: float) -> tuple[datetime, int]:
-    offset_min = int(round((longitude - 120.0) * 4))
+    """将钟表时间（区时）修正为当地平太阳时。
+
+    根据 local_dt 自带的时区信息推导该时区的标准经度
+    （理论时区中心经度 = UTC 偏移小时数 × 15°，半小时/三刻时区
+    如印度 +5:30→82.5° 由 `_standard_longitude` 精确处理），再用
+    (当地经度 - 标准经度) × 4 分钟 得到平太阳时修正量。
+    若 local_dt 没有时区信息，回退到东八区标准经度 120°。
+    """
+    utcoffset = local_dt.utcoffset()
+    if utcoffset is None:
+        standard_lon = 120.0
+    else:
+        standard_lon = _standard_longitude(utcoffset)
+    offset_min = int(round((longitude - standard_lon) * 4))
     return local_dt + timedelta(minutes=offset_min), offset_min
 
 
@@ -196,25 +210,39 @@ def shichen_index(hour: int, minute: int) -> int:
 
 
 def safe_anchor_date(year: int, birth_mm_dd: str) -> tuple[str, str | None]:
-    month, day = map(int, birth_mm_dd.split("-"))
+    try:
+        month, day = map(int, birth_mm_dd.split("-"))
+    except ValueError as exc:
+        raise ValueError(
+            f"生日锚点格式错误：'{birth_mm_dd}'，应为 MM-DD（如 05-15）"
+        ) from exc
+    if not (1 <= month <= 12):
+        raise ValueError(f"生日月份非法：{month}，应为 1-12")
+    if not (1 <= day <= 31):
+        raise ValueError(f"生日日期非法：{day}，应为 1-31")
     try:
         dt = datetime(year, month, day)
         return dt.strftime("%Y-%m-%d"), None
     except ValueError:
+        # 月合法但日不合法（如 2-30），回退到当月 28 号（所有月份都安全）
         fallback = datetime(year, month, 28)
         note = f"生日锚点 {year}-{birth_mm_dd} 不存在，自动回退到 {fallback:%Y-%m-%d}"
         return fallback.strftime("%Y-%m-%d"), note
 
 
-def unique_keep_order(items: list[str]) -> list[str]:
-    out: list[str] = []
-    seen: set[str] = set()
-    for x in items:
-        if x in seen:
-            continue
-        seen.add(x)
-        out.append(x)
-    return out
+def _standard_longitude(utcoffset) -> float:
+    """根据 UTC 偏移推导时区标准经度。
+
+    用「offset_hours 向下取整 × 15°」而不是 round × 15°，
+    以正确处理半小时/三刻时区（印度 +5:30→82.5°、缅甸 +6:30→97.5°、
+    尼泊尔 +5:45→78.75°）。向零取整保证 UTC+8→120°、UTC+9→135° 等整时区不变。
+    """
+    offset_hours = utcoffset.total_seconds() / 3600.0
+    # 向零取整：+5.5→5, +5.75→5, -3.5→-3
+    base_hour = int(offset_hours) if offset_hours >= 0 else -int(-offset_hours)
+    fractional_hour = offset_hours - base_hour
+    # 标准经线 = 整小时部分 × 15 + 小数部分 × 15
+    return base_hour * 15.0 + fractional_hour * 15.0
 
 
 def normalize_palace_name(name: str) -> str:
@@ -222,8 +250,33 @@ def normalize_palace_name(name: str) -> str:
     return PALACE_ALIAS_MAP.get(token, token)
 
 
+MUTAGEN_LABELS = ("禄", "权", "科", "忌")
+
+
 def normalize_mutagen(mutagen: list[str]) -> list[str]:
-    return unique_keep_order([MUTAGEN_KEY_TO_CN.get(x, x) for x in (mutagen or [])])
+    """iztro_py 返回的四化顺序固定为 [化禄星, 化权星, 化科星, 化忌星]。
+
+    保留 list 形式用于向后兼容（'、'.join、迭代等），不做去重——
+    去重会丢失禄/忌同星这类合法情形（如癸年贪狼既化禄又化忌）。
+    """
+    return [MUTAGEN_KEY_TO_CN.get(x, x) for x in (mutagen or [])]
+
+
+def label_mutagen(mutagen: list[str]) -> dict[str, str]:
+    """将四化列表映射为 {"禄": star, "权": star, "科": star, "忌": star}。
+
+    若 iztro 返回不足 4 项（理论上不会发生），缺位补空串。
+    """
+    stars = normalize_mutagen(mutagen)
+    while len(stars) < 4:
+        stars.append("")
+    return dict(zip(MUTAGEN_LABELS, stars[:4]))
+
+
+def format_mutagen(mutagen: list[str]) -> str:
+    """格式化为带禄权科忌标签的字符串：化禄X、化权Y、化科Z、化忌W。"""
+    labeled = label_mutagen(mutagen)
+    return "、".join(f"化{k}{v}" for k, v in labeled.items() if v)
 
 
 def _ensure_iztro_py() -> Any:
@@ -331,6 +384,7 @@ def ziwei_block_py(calc_date: str, calc_time: str, gender_cn: str, year: int | N
                 "stem_branch": f"{y.translate_heavenly_stem()}{y.translate_earthly_branch()}",
                 "major": _safe_names(getattr(y, "major_stars", [])),
                 "mutagen": normalize_mutagen(mutagen_keys),
+                "mutagen_labeled": label_mutagen(mutagen_keys),
             },
             "age": {
                 "name": hs.age.name,
@@ -395,6 +449,7 @@ def ziwei_block_js(calc_date: str, calc_time: str, gender_cn: str, year: int | N
         data["horoscope"]["yearly"]["palace"] = normalize_palace_name(data["horoscope"]["yearly"]["palace"])
         data["horoscope"]["age"]["palace"] = normalize_palace_name(data["horoscope"]["age"]["palace"])
         data["horoscope"]["yearly"]["mutagen"] = normalize_mutagen(data["horoscope"]["yearly"].get("mutagen", []))
+        data["horoscope"]["yearly"]["mutagen_labeled"] = label_mutagen(data["horoscope"]["yearly"].get("mutagen", []))
 
     data["engine"] = "js"
     data["hour_index"] = idx
@@ -403,19 +458,26 @@ def ziwei_block_js(calc_date: str, calc_time: str, gender_cn: str, year: int | N
 
 
 def _core(ziwei: dict[str, Any]) -> dict[str, Any]:
+    """提取跨引擎比对的核心字段。
+
+    仅保留 py/js 引擎在派别差异下也应当一致的不变量：
+      五行局、时辰、命宫干支、命宫主星、身宫、流年宫、流年四化（带禄权科忌标签）、大限宫。
+    不再纳入 `palace_signature`——12 宫全主星签名会因小星派别差异/借星规则不同
+    而产生非阻塞噪声，遮蔽真正应该报错的核心分歧。
+    """
     base = {
         "five_elements_class": ziwei["five_elements_class"],
         "hour_index": ziwei["hour_index"],
         "ming_stem_branch": f"{ziwei['ming']['stem']}{ziwei['ming']['branch']}",
         "ming_major": ziwei["ming"]["major"],
         "body_palace": ziwei["body"]["name"] if ziwei.get("body") else None,
-        "palace_signature": [
-            f"{p['name']}|{p['stem']}{p['branch']}|{','.join(p['major'])}" for p in ziwei.get("palaces", [])
-        ],
     }
     if ziwei.get("horoscope"):
         base["yearly_palace"] = ziwei["horoscope"]["yearly"]["palace"]
         base["yearly_mutagen"] = ziwei["horoscope"]["yearly"]["mutagen"]
+        base["yearly_mutagen_labeled"] = ziwei["horoscope"]["yearly"].get(
+            "mutagen_labeled", label_mutagen(ziwei["horoscope"]["yearly"].get("mutagen", []))
+        )
         base["decadal_palace"] = ziwei["horoscope"]["decadal"]["palace"]
     return base
 
@@ -487,7 +549,7 @@ def interpretation_framework(ziwei: dict[str, Any], target_year: int | None) -> 
             [
                 f"官禄宫主星：{'、'.join(career_major) if career_major else '无主星'}",
                 f"{year_text}流年宫：{yearly.get('palace', '未知')}",
-                f"{year_text}四化：{'、'.join(muta) if muta else '无'}",
+                f"{year_text}四化：{format_mutagen(muta) if muta else '无'}",
             ],
             [
                 star_classic(career_major, "domain", "官禄宫主“职责-角色-权责边界”的演进轨迹。"),
@@ -547,7 +609,7 @@ def interpretation_framework(ziwei: dict[str, Any], target_year: int | None) -> 
             [
                 f"大限宫：{h['decadal']['palace']}（{h['decadal']['stem_branch']}）",
                 f"流年宫：{h['yearly']['palace']}（{h['yearly']['stem_branch']}）",
-                f"四化：{'、'.join(h['yearly']['mutagen']) if h['yearly']['mutagen'] else '无'}",
+                f"四化：{format_mutagen(h['yearly']['mutagen']) if h['yearly']['mutagen'] else '无'}",
                 f"岁位：{h['age']['name']} @ {h['age']['palace']}",
             ],
             [
@@ -604,7 +666,7 @@ def render_markdown(payload: dict[str, Any], template: str) -> str:
                 f"- 大限宫：{h['decadal']['palace']}（{h['decadal']['stem_branch']}）",
                 f"- 流年宫：{h['yearly']['palace']}（{h['yearly']['stem_branch']}）",
                 f"- 岁位：{h['age']['name']} @ {h['age']['palace']}",
-                f"- 四化：{_format_items(h['yearly']['mutagen'])}",
+                f"- 四化：{format_mutagen(h['yearly']['mutagen'])}",
             ]
         )
 
@@ -816,7 +878,7 @@ def render_svg(payload: dict[str, Any]) -> str:
     if z.get("horoscope"):
         center.append(f"{z['horoscope']['year']} 流年宫：{z['horoscope']['yearly']['palace']}")
         center.append(f"大限宫：{z['horoscope']['decadal']['palace']}  岁位：{z['horoscope']['age']['name']}")
-        center.append(f"四化：{_format_items(_clip_items(z['horoscope']['yearly']['mutagen'], 6), '无')}")
+        center.append(f"四化：{format_mutagen(z['horoscope']['yearly']['mutagen'])}")
 
     yy = cy + 56
     for idx, item in enumerate(center):
@@ -903,6 +965,10 @@ def build_payload(args: argparse.Namespace) -> dict[str, Any]:
 
     input_local = parse_local_datetime(args.date, args.time, args.timezone)
     calc_local, offset_min = apply_longitude(input_local, args.longitude)
+    # 晚子时（23:00-23:59）按"子时归次日"流派，排盘日柱推进一天；
+    # 时辰下标仍为子（idx=0），由 shichen_index 保证。
+    if calc_local.hour >= 23:
+        calc_local = calc_local + timedelta(days=1)
     calc_date = calc_local.strftime("%Y-%m-%d")
     calc_time = calc_local.strftime("%H:%M")
     birth_mm_dd = args.date[5:]
@@ -928,9 +994,15 @@ def build_payload(args: argparse.Namespace) -> dict[str, Any]:
             engine_info["warnings"].append(f"js 引擎失败：{exc}")
 
     if args.engine == "py":
-        if ziwei_py is None and ziwei_js is None:
-            raise RuntimeError("py/js 引擎都失败，无法生成紫微盘")
         if ziwei_py is None:
+            # py 模式默认不会运行 js 引擎；这里主动尝试 js 作为回退
+            try:
+                ziwei_js = ziwei_block_js(calc_date, calc_time, gender_cn, args.year, birth_mm_dd)
+                engine_info["warnings"].append("py 引擎失败，已回退到 js 引擎")
+            except Exception as exc2:
+                engine_info["warnings"].append(f"js 回退也失败：{exc2}")
+            if ziwei_js is None:
+                raise RuntimeError("py 引擎失败且 js 回退不可用，无法生成紫微盘")
             ziwei = ziwei_js
             engine_info["used"] = "js"
             engine_info["fallback"] = "py->js"
@@ -938,9 +1010,15 @@ def build_payload(args: argparse.Namespace) -> dict[str, Any]:
             ziwei = ziwei_py
             engine_info["used"] = "py"
     elif args.engine == "js":
-        if ziwei_py is None and ziwei_js is None:
-            raise RuntimeError("js/py 引擎都失败，无法生成紫微盘")
         if ziwei_js is None:
+            # js 模式默认不会运行 py 引擎；这里主动尝试 py 作为回退
+            try:
+                ziwei_py = ziwei_block_py(calc_date, calc_time, gender_cn, args.year, birth_mm_dd)
+                engine_info["warnings"].append("js 引擎失败，已回退到 py 引擎")
+            except Exception as exc2:
+                engine_info["warnings"].append(f"py 回退也失败：{exc2}")
+            if ziwei_py is None:
+                raise RuntimeError("js 引擎失败且 py 回退不可用，无法生成紫微盘")
             ziwei = ziwei_py
             engine_info["used"] = "py"
             engine_info["fallback"] = "js->py"
@@ -1008,7 +1086,7 @@ def main() -> None:
     ap.add_argument("--year", type=int, default=None, help="年度锚点年份")
     ap.add_argument("--engine", choices=["py", "js", "dual"], default="py")
     ap.add_argument("--template", choices=["lite", "pro", "executive"], default="pro")
-    ap.add_argument("--chart", choices=["none", "svg", "jpg"], default="jpg")
+    ap.add_argument("--chart", choices=["none", "svg", "jpg"], default="none")
     ap.add_argument("--chart-out", default=None)
     ap.add_argument("--chart-quality", type=int, default=92, help="JPG 质量（1-100），默认 92")
     ap.add_argument("--chart-backend", choices=["auto", "cairosvg"], default="auto")

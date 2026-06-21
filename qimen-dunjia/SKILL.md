@@ -103,25 +103,15 @@ compatibility: Requires Python 3.11+, lunar_python, and tzdata; run scripts/qime
 
 ### 第 3 步：调用脚本做固定计算
 
-**前置：确认依赖已安装**
-
-执行正式排盘前先检查依赖。如果未安装，先运行：
+从 `xiaozhua-divination` 技能根目录调用统一 wrapper：
 
 ```bash
-pip install "lunar_python>=1.4.8,<2" "tzdata>=2024.1"
-```
-
-**执行脚本**
-
-脚本路径相对于技能根目录：
-
-```bash
-python "qimen-dunjia/scripts/qimen_cli.py" \
+python3 scripts/run_qimen.py \
   --input /tmp/qimen_input.json \
   --output /tmp/qimen_output.json
 ```
 
-先把输入 JSON 写入 `/tmp/qimen_input.json`，再执行上述命令，读取输出文件。
+先把输入 JSON 写入 `/tmp/qimen_input.json`，再执行上述命令，读取输出文件。wrapper 会自动加载 `scripts/.venv` 中的依赖；如果没有本地 venv，调用环境需要先安装根目录 `requirements.txt`。
 
 输入 JSON 最低字段：
 
@@ -253,11 +243,7 @@ python "qimen-dunjia/scripts/qimen_cli.py" \
 
 #### 风险提醒与免责声明
 
-高风险话题必须额外提醒现实专业路径。
-
-每次正式解盘结尾都附上：
-
-> 温馨提示：奇门遁甲属于传统文化中的术数模型，本次解读用于辅助观察与思考，不代替医疗、法律、财务等专业意见。涉及重大决策时，请同时结合现实信息理性判断。
+高风险话题必须额外提醒现实专业路径。免责声明全文见 [`../references/disclaimer.md`](../references/disclaimer.md)（全仓库共享单一事实源），涵盖统一声明、中华术数边界提示与高风险主题强制现实建议。每次正式解盘结尾必须附上其中"一、统一免责声明"的正文，可微调措辞。
 
 ## 输出风格
 
@@ -295,6 +281,8 @@ python "qimen-dunjia/scripts/qimen_cli.py" \
 - `references/yongshen.md`：取用神顺序和事项映射
 - `references/geju.md`：格局与常见组合的简明解释
 - `references/examples.md`：示例输出
+- `references/calculation-rules.md`：九宫、八门、九星、八神固定宫位与用局表
+- `references/interpretation-guide.md`：星门神含义详解、常见格局、表达指南、禁用清单
 
 ## 禁止事项
 
