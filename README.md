@@ -154,7 +154,7 @@ dist/xiaozhua-divination.zip
 | 紫微斗数 | [spyfree](https://clawhub.com) | spyfree + mingkunyuan |
 | 奇门遁甲 | [FANzR-arch](https://github.com/FANzR-arch/Numerologist_skills) | FANzR-arch + eamanc-lab + mingkunyuan |
 | 六爻问卦 | [天工长老](https://clawhub.com) | eamanc-lab + mingkunyuan |
-| 八字四柱 | — | eamanc-lab |
+| 八字四柱 | — | eamanc-lab + [jinchenma94/bazi-skill](https://github.com/jinchenma94/bazi-skill)（MIT，九本典籍摘要与历史事件校准步骤）|
 | 塔罗牌 | — | eamanc-lab |
 | 占星/九型/MBTI | — | clider0915 |
 
