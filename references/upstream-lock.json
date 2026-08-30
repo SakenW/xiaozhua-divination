@@ -1,0 +1,64 @@
+{
+  "schema_version": 1,
+  "last_reviewed": "2026-08-27",
+  "policy": {
+    "automatic_sync": false,
+    "rule": "上游更新只能触发人工审查；先核对许可证、输入输出口径与回归测试，再决定是否吸收。"
+  },
+  "sources": [
+    {
+      "name": "lunar-python",
+      "url": "https://github.com/6tail/lunar-python",
+      "revision": "000c8a3d74eed098d6256a28fdd51b869324c559",
+      "version": "1.4.8",
+      "license": "MIT",
+      "used_by": ["qimen-dunjia", "liuyao", "bazi", "ziwei-doushu"],
+      "adoption": "runtime dependency; keep within the 1.x compatibility range"
+    },
+    {
+      "name": "iztro-py",
+      "url": "https://github.com/spyfree/iztro-py",
+      "revision": "4b247ede19e2dd17c8b5fb82733147ea3b4d87fd",
+      "version": "0.5.0",
+      "license": "MIT",
+      "used_by": ["ziwei-doushu"],
+      "adoption": "runtime dependency; constrained to >=0.5.0,<0.6 because 0.x releases may change output semantics"
+    },
+    {
+      "name": "Numerologist_skills",
+      "url": "https://github.com/FANzR-arch/Numerologist_skills",
+      "revision": "ea28c3fb7e808fa74f6b8e7b4c9ac8c8a9d44c39",
+      "version": null,
+      "license": "not declared in repository",
+      "used_by": ["qimen-dunjia"],
+      "adoption": "reference only; do not copy code without an explicit license"
+    },
+    {
+      "name": "bazi-skill",
+      "url": "https://github.com/jinchenma94/bazi-skill",
+      "revision": "112a5d84cd1a001a0038cafca3be68d93e4c0cc9",
+      "version": null,
+      "license": "MIT",
+      "used_by": ["bazi"],
+      "adoption": "reference and test-case source; do not replace the lunar-python calculation engine without a separate equivalence review"
+    },
+    {
+      "name": "eamanc-lab",
+      "url": null,
+      "revision": null,
+      "version": null,
+      "license": "unverified",
+      "used_by": ["qimen-dunjia", "liuyao", "bazi", "tarot"],
+      "adoption": "citation name only; canonical source URL and revision are required before future update tracking"
+    },
+    {
+      "name": "mingkunyuan",
+      "url": null,
+      "revision": null,
+      "version": null,
+      "license": "unverified",
+      "used_by": ["ziwei-doushu", "qimen-dunjia", "liuyao"],
+      "adoption": "citation name only; canonical source URL and revision are required before future update tracking"
+    }
+  ]
+}

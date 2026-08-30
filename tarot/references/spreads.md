@@ -6,6 +6,7 @@
 - [Three-Card Spread](#three-card-spread)
 - [Celtic Cross — 10 Cards](#celtic-cross--10-cards)
 - [Relationship Spread — 5 Cards](#relationship-spread--5-cards)
+- [Choice Spread — 3 Cards](#choice-spread--3-cards)
 - [Horseshoe Spread — 7 Cards](#horseshoe-spread--7-cards)
 - [Spread Selection Guide](#spread-selection-guide)
 
@@ -38,7 +39,7 @@ The simplest spread — one card drawn.
 | Mind / Body / Spirit | Body / Material | Mind / Thought | Spirit / Soul |
 | Situation Analysis | Situation | Challenge | Advice |
 | Decision | Option A | Option B | Guidance |
-| Relationship | Your feelings | Their feelings | Direction of the relationship |
+| Relationship | Your perspective | Observable interaction | Direction to explore |
 
 ---
 
@@ -86,10 +87,26 @@ The most classic and comprehensive spread in tarot.
 | Position | Meaning |
 |----------|---------|
 | 1 | Your feelings / perspective |
-| 2 | Their feelings / perspective |
+| 2 | Their observable role / interaction |
 | 3 | The foundation / bond between you |
 | 4 | The current challenge / obstacle |
-| 5 | The potential / direction of the relationship |
+| 5 | A direction to explore in the relationship |
+
+Interpret the second position through the querent's observations and questions for a real conversation. It does not reveal a third party's private thoughts, health, intentions, or future behavior.
+
+---
+
+## Choice Spread — 3 Cards
+
+**Best for**: two-option decisions where the querent wants a compact side-by-side view.
+
+| Position | Meaning |
+|----------|---------|
+| 1 | Option A |
+| 2 | Option B |
+| 3 | Guidance |
+
+This is the deterministic script's `choice` spread and matches the Three-Card decision variation.
 
 ---
 
@@ -118,4 +135,4 @@ The most classic and comprehensive spread in tarot.
 | Love / relationship | Relationship Spread | Both perspectives + relational dynamic |
 | Complex decision | Horseshoe | Moderate depth, includes hidden influences |
 | Deep dive | Celtic Cross | Most comprehensive — 10 dimensions |
-| Two options | Three-Card variant (Decision) | Direct side-by-side comparison |
+| Two options | Choice Spread | Direct side-by-side comparison |

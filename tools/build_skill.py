@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import argparse
+import re
 import shutil
 from pathlib import Path
 
@@ -10,15 +11,18 @@ SKILL_NAME = "xiaozhua-divination"
 ROOT_FILES = [
     "SKILL.md",
     "requirements.txt",
+    "LICENSE",
 ]
 
 ROOT_DIRS = [
+    "references",
     "scripts",
     "liuyao",
     "qimen-dunjia",
     "ziwei-doushu",
     "bazi",
     "tarot",
+    "meihua-yishu",
     "astrology",
     "enneagram",
     "mbti",
@@ -34,11 +38,11 @@ FORBIDDEN_NAMES = {
     "__pycache__",
     ".DS_Store",
     "README.md",
-    "LICENSE",
     ".gitignore",
     "dist",
     "tools",
     "tests",
+    "self_check.py",
     "dev",
     "releases",
 }
@@ -71,10 +75,30 @@ def assert_clean_package(package_dir: Path) -> None:
         joined = "\n".join(f"  - {item}" for item in forbidden[:40])
         raise SystemExit(f"Forbidden files found in package:\n{joined}")
 
-    required = [package_dir / "SKILL.md", package_dir / "requirements.txt"]
+    required = [
+        package_dir / "SKILL.md",
+        package_dir / "requirements.txt",
+        package_dir / "LICENSE",
+        package_dir / "references" / "disclaimer.md",
+    ]
     missing = [str(path.relative_to(package_dir)) for path in required if not path.exists()]
     if missing:
         raise SystemExit(f"Missing required package files: {', '.join(missing)}")
+
+    broken_links: list[str] = []
+    for markdown in package_dir.rglob("*.md"):
+        text = markdown.read_text(encoding="utf-8")
+        for match in re.finditer(r"\[[^\]]*\]\(([^)]+)\)", text):
+            target_text = match.group(1).split("#", 1)[0]
+            if not target_text or "://" in target_text or target_text.startswith("mailto:"):
+                continue
+            target = (markdown.parent / target_text).resolve()
+            if not target.exists():
+                line = text[: match.start()].count("\n") + 1
+                broken_links.append(f"{markdown.relative_to(package_dir)}:{line} -> {target_text}")
+    if broken_links:
+        joined = "\n".join(f"  - {item}" for item in broken_links[:40])
+        raise SystemExit(f"Broken local Markdown links in package:\n{joined}")
 
 
 def build(output_root: Path, make_zip: bool) -> Path:

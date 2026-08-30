@@ -28,6 +28,9 @@ jobs:
           python -m py_compile ziwei-doushu/scripts/ziwei_chart.py
           python -m py_compile qimen-dunjia/scripts/qimen_cli.py
           python -m py_compile liuyao/scripts/liuyao_pan.py
+          python -m py_compile bazi/scripts/bazi_chart.py
+          python -m py_compile meihua-yishu/scripts/meihua_pan.py
+          python -m py_compile scripts/run_bazi.py scripts/run_liuyao.py scripts/run_meihua.py scripts/run_qimen.py scripts/run_tarot.py scripts/run_ziwei.py
 
       - name: Regression tests
-        run: python3 tests/run_regressions.py
+        run: python3 tests/run_regressions.py package wrappers qimen ziwei liuyao bazi tarot meihua

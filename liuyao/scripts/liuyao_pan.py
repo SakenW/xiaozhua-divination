@@ -183,12 +183,18 @@ class LiuYaoPan:
     """六爻排盘类"""
     
     @staticmethod
-    def get_year_gan_zhi(year: int, month: int = 2, day: int = 5) -> Tuple[str, str]:
+    def get_year_gan_zhi(
+        year: int,
+        month: int = 2,
+        day: int = 5,
+        hour: int = 12,
+        minute: int = 0,
+    ) -> Tuple[str, str]:
         """获取年干支（带立春切换）。
 
         历法约定：以"立春"为年柱分界，立春前仍属上一年。
-        - 默认参数 (2, 5) 假定在立春后，直接返回 year 的年柱；
-        - 传入实际公历月日时，若早于立春（约 2/4），返回 year-1 的年柱。
+        - 默认参数 (2, 5, 12:00) 假定在立春后，直接返回 year 的年柱；
+        - 传入实际公历月日时分时，按精确立春时刻判断生效年份。
 
         若 lunar_python 可用，使用其精确立春时刻；否则按公历 2 月 4 日近似。
         退回近似时记录到 warnings（由调用方决定是否展示）。
@@ -199,7 +205,7 @@ class LiuYaoPan:
         # 精确化：用 lunar_python 检查立春
         try:
             from lunar_python import Solar
-            solar = Solar.fromYmd(year, month, day)
+            solar = Solar.fromYmdHms(year, month, day, hour, minute, 0)
             jie_qi = solar.getLunar().getJieQiTable()
             li_chun = jie_qi.get('立春')
             if li_chun is not None:
@@ -245,7 +251,13 @@ class LiuYaoPan:
     ]
 
     @staticmethod
-    def get_solar_month_zhi(month: int, day: int, year: int = 2000) -> str:
+    def get_solar_month_zhi(
+        month: int,
+        day: int,
+        year: int = 2000,
+        hour: int = 12,
+        minute: int = 0,
+    ) -> str:
         """根据公历月日推算节气月支（近似，回退用）。
 
         若 lunar_python 可用，优先使用精确节气（getPrevJieQi）。
@@ -253,25 +265,16 @@ class LiuYaoPan:
         # 首选：lunar_python 的精确"节"（立春/惊蛰/.../小寒）
         try:
             from lunar_python import Solar
-            solar = Solar.fromYmd(year, month, day)
+            solar = Solar.fromYmdHms(year, month, day, hour, minute, 0)
             lunar = solar.getLunar()
-            # getPrevJieQi(False) 返回上一个"节"（非"气"）的 Solar
-            prev_jie = lunar.getPrevJieQi(False)
+            prev_jie = lunar.getPrevJie(False)
             # 节气名（如"立春"）→ 月支
             jie_to_zhi = {
                 '立春': '寅', '惊蛰': '卯', '清明': '辰', '立夏': '巳',
                 '芒种': '午', '小暑': '未', '立秋': '申', '白露': '酉',
                 '寒露': '戌', '立冬': '亥', '大雪': '子', '小寒': '丑',
             }
-            prev_jie_name = prev_jie.getLunar().getJieQi() if hasattr(prev_jie, 'getLunar') else None
-            # lunar_python 的 getPrevJieQi 返回的是 Lunar 或 Solar，需用 getName 或类似
-            # 保险起见，尝试多种方式获取节气名
-            if prev_jie_name is None:
-                # 直接获取节气名（lunar_python JieQi 在 Lunar 上）
-                try:
-                    prev_jie_name = lunar.getPrevJieQiName()
-                except Exception:
-                    pass
+            prev_jie_name = prev_jie.getName() if prev_jie is not None else None
             if prev_jie_name and prev_jie_name in jie_to_zhi:
                 return jie_to_zhi[prev_jie_name]
         except Exception:
@@ -291,19 +294,25 @@ class LiuYaoPan:
         return '寅'
 
     @staticmethod
-    def get_month_gan_zhi(year: int, month: int, day: int = 15) -> Tuple[str, str]:
+    def get_month_gan_zhi(
+        year: int,
+        month: int,
+        day: int = 15,
+        hour: int = 12,
+        minute: int = 0,
+    ) -> Tuple[str, str]:
         """获取月干支（按节气划分月支）
 
         五虎遁规则：甲己之年丙作首（寅月起丙寅），乙庚之岁戊为头，
                     丙辛之年庚寅起，丁壬壬寅顺水流，戊癸甲寅好追求。
         """
         # 月支：按节气确定
-        zhi = LiuYaoPan.get_solar_month_zhi(month, day, year)
+        zhi = LiuYaoPan.get_solar_month_zhi(month, day, year, hour, minute)
         zhi_index = DI_ZHI.index(zhi)
 
         # 月干：五虎遁 — 寅月的起始天干
         # 关键：年干必须基于立春判断后的"生效年份"
-        year_gan, _ = LiuYaoPan.get_year_gan_zhi(year, month, day)
+        year_gan, _ = LiuYaoPan.get_year_gan_zhi(year, month, day, hour, minute)
         # 寅月起始天干：甲→丙 乙→戊 丙→庚 丁→壬 戊→甲 己→丙 庚→戊 辛→庚 壬→壬 癸→甲
         yin_start = {'甲': 2, '乙': 4, '丙': 6, '丁': 8, '戊': 0,
                      '己': 2, '庚': 4, '辛': 6, '壬': 8, '癸': 0}
@@ -364,7 +373,9 @@ class LiuYaoPan:
         hour = date.hour
         
         # 年支数（1-12）— 立春切换后的生效年支
-        _, year_zhi = cls.get_year_gan_zhi(year, date.month, date.day)
+        _, year_zhi = cls.get_year_gan_zhi(
+            year, date.month, date.day, date.hour, date.minute
+        )
         year_zhi_num = DI_ZHI.index(year_zhi) + 1  # 子=1...亥=12
         
         # 时支数（1-12）
@@ -480,12 +491,14 @@ class LiuYaoPan:
         """数字起卦（梅花易数邵雍法）
 
         返回：(上卦，下卦，动爻)，取值范围上/下卦∈1-8、动爻∈1-6。
-        - 三数及以上：上卦=数1%8，下卦=数2%8，动爻=数3%6（多余数字忽略）
+        - 三数：上卦=数1%8，下卦=数2%8，动爻=数3%6
         - 两数：上卦=数1%8，下卦=数2%8，动爻=(数1+数2)%6
         - 一数：上卦=数%8，下卦=(数//8)%8，动爻=数%6（邵雍大数起卦）
         余数为 0 时，上/下卦取 8、动爻取 6。
         """
-        if len(numbers) >= 3:
+        if not 1 <= len(numbers) <= 3:
+            raise ValueError("数字起卦需要 1-3 个整数，不接受空输入或多余数字")
+        if len(numbers) == 3:
             shang_gua = numbers[0] % 8
             xia_gua = numbers[1] % 8
             dong_yao = numbers[2] % 6
@@ -494,7 +507,7 @@ class LiuYaoPan:
             xia_gua = numbers[1] % 8
             dong_yao = (numbers[0] + numbers[1]) % 6
         else:
-            n = numbers[0] if numbers else 0
+            n = numbers[0]
             shang_gua = n % 8
             xia_gua = (n // 8) % 8
             dong_yao = n % 6
@@ -959,8 +972,12 @@ def liuyao_pan(
     # - 年柱、月柱：基于实际年月日（带立春/节气切换）
     # - 日柱：基于 day_dt_for_pillar（晚子时归次日）
     # - 时柱：基于 day_dt_for_pillar 的日干遁时干
-    year_gan, year_zhi = LiuYaoPan.get_year_gan_zhi(dt.year, dt.month, dt.day)
-    month_gan, month_zhi = LiuYaoPan.get_month_gan_zhi(dt.year, dt.month, dt.day)
+    year_gan, year_zhi = LiuYaoPan.get_year_gan_zhi(
+        dt.year, dt.month, dt.day, dt.hour, dt.minute
+    )
+    month_gan, month_zhi = LiuYaoPan.get_month_gan_zhi(
+        dt.year, dt.month, dt.day, dt.hour, dt.minute
+    )
     day_gan, day_zhi = LiuYaoPan.get_day_gan_zhi(day_dt_for_pillar)
     hour_gan, hour_zhi = LiuYaoPan.get_hour_gan_zhi(day_gan, dt.hour)
     
@@ -998,7 +1015,10 @@ def liuyao_pan(
         ]
         qi_gua_fang_shi = '铜钱'
     elif numbers:
-        num_list = [int(x.strip()) for x in numbers.split(',')]
+        try:
+            num_list = [int(x.strip()) for x in numbers.split(',')]
+        except ValueError as exc:
+            raise ValueError(f"数字起卦的每个值必须为整数，解析失败：{exc}") from exc
         shang_gua, xia_gua, dong_yao_single = LiuYaoPan.number_to_gua(num_list)
         dong_yao_list = [dong_yao_single] if dong_yao_single else []
         qi_gua_fang_shi = '数字'
@@ -1199,7 +1219,7 @@ def format_output(result: Dict) -> str:
 def main():
     parser = argparse.ArgumentParser(description='六爻纳甲排盘工具')
     parser.add_argument('--date', '-d', type=str, help='日期时间 (YYYY-MM-DD HH:MM)')
-    parser.add_argument('--numbers', '-n', type=str, help='数字起卦 (逗号分隔)')
+    parser.add_argument('--numbers', '-n', type=str, help='数字起卦 (1-3 个整数，逗号分隔)')
     parser.add_argument('--coins', '-c', type=str, help='铜钱起卦 (6 次正面数/字面数 0-3，逗号分隔)')
     parser.add_argument('--question', '-q', type=str, default='通用', help='问事类型')
     parser.add_argument('--json', '-j', action='store_true', help='输出 JSON 格式')

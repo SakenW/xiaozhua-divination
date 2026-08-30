@@ -58,8 +58,8 @@
   },
   "chart": {
     "dun_type": "阳遁",
-    "yuan": "中元",
-    "ju_number": 2,
+    "yuan": "下元",
+    "ju_number": 8,
     "xunshou": "甲子",
     "hidden_yi": "戊",
     "kongwang": [
@@ -71,11 +71,11 @@
     ],
     "time_stem_visible": "辛",
     "zhifu": {
-      "star": "天芮",
+      "star": "天任",
       "palace": 2
     },
     "zhishi": {
-      "door": "死门",
+      "door": "生门",
       "palace": 2
     },
     "grid_order": [

@@ -184,6 +184,29 @@ def parse_local_datetime(date_text: str, time_text: str, timezone_name: str) -> 
     return naive.replace(tzinfo=tz)
 
 
+def solar_date_from_input(
+    date_text: str, time_text: str, date_type: str, leap_month: bool
+) -> str:
+    if date_type == "solar":
+        if leap_month:
+            raise ValueError("--leap-month 仅适用于 --date-type lunar")
+        return date_text
+
+    try:
+        year, month, day = (int(part) for part in date_text.split("-"))
+        hour, minute = (int(part) for part in time_text.split(":")[:2])
+    except ValueError as exc:
+        raise ValueError("date/time 格式错误，需要 YYYY-MM-DD + HH:MM") from exc
+
+    try:
+        from lunar_python import Lunar
+    except ImportError as exc:
+        raise RuntimeError("农历输入需要安装 lunar_python") from exc
+
+    lunar = Lunar.fromYmdHms(year, -month if leap_month else month, day, hour, minute, 0)
+    return lunar.getSolar().toYmd()
+
+
 def apply_longitude(local_dt: datetime, longitude: float) -> tuple[datetime, int]:
     """将钟表时间（区时）修正为当地平太阳时。
 
@@ -193,6 +216,8 @@ def apply_longitude(local_dt: datetime, longitude: float) -> tuple[datetime, int
     (当地经度 - 标准经度) × 4 分钟 得到平太阳时修正量。
     若 local_dt 没有时区信息，回退到东八区标准经度 120°。
     """
+    if not -180.0 <= longitude <= 180.0:
+        raise ValueError("longitude 必须在 -180 到 180 之间")
     utcoffset = local_dt.utcoffset()
     if utcoffset is None:
         standard_lon = 120.0
@@ -203,8 +228,16 @@ def apply_longitude(local_dt: datetime, longitude: float) -> tuple[datetime, int
 
 
 def shichen_index(hour: int, minute: int) -> int:
+    """将当地钟表时刻映射为 iztro 的时辰索引。
+
+    iztro-py 0.5 起把子时拆分为早子（00:00-00:59，索引 0）与
+    晚子（23:00-23:59，索引 12）。其余时辰仍沿用 1-11；显示地支
+    时必须以索引模 12 取值。
+    """
     total = hour * 60 + minute
-    if total >= 23 * 60 or total < 60:
+    if total >= 23 * 60:
+        return 12
+    if total < 60:
         return 0
     return ((total - 60) // 120) + 1
 
@@ -314,6 +347,17 @@ def _palace_item(p: Any, idx: int) -> dict[str, Any]:
     }
 
 
+def _valid_palace_index(index: Any) -> bool:
+    """仅接受 12 宫的真实索引，拒绝 iztro 的运限越界标记 -1。"""
+    return isinstance(index, int) and 0 <= index < 12
+
+
+def _horoscope_palace(chart: Any, index: Any) -> Any | None:
+    if not _valid_palace_index(index):
+        return None
+    return chart.palace(index)
+
+
 def _ming_context(palaces: list[dict[str, Any]], ming_index: int) -> dict[str, Any]:
     idxs = [ming_index, (ming_index + 4) % 12, (ming_index + 8) % 12, (ming_index + 6) % 12]
     tags = ["本宫", "三方一", "三方二", "对宫"]
@@ -367,10 +411,17 @@ def ziwei_block_py(calc_date: str, calc_time: str, gender_cn: str, year: int | N
     if year:
         anchor_date, anchor_note = safe_anchor_date(year, birth_mm_dd)
         hs = chart.horoscope(anchor_date)
-        d = chart.palace(hs.decadal.index)
-        y = chart.palace(hs.yearly.index)
-        a = chart.palace(hs.age.index)
+        d = _horoscope_palace(chart, hs.decadal.index)
+        y = _horoscope_palace(chart, hs.yearly.index)
+        a = _horoscope_palace(chart, hs.age.index)
+        if y is None:
+            raise RuntimeError("iztro-py 返回了无效的流年宫位索引")
         mutagen_keys = list(hs.yearly.mutagen or [])
+        out_of_range: list[str] = []
+        if d is None:
+            out_of_range.append("大限")
+        if a is None:
+            out_of_range.append("小限")
         horoscope = {
             "year": year,
             "anchor_date": anchor_date,
@@ -378,7 +429,7 @@ def ziwei_block_py(calc_date: str, calc_time: str, gender_cn: str, year: int | N
                 "palace": normalize_palace_name(d.translate_name()),
                 "stem_branch": f"{d.translate_heavenly_stem()}{d.translate_earthly_branch()}",
                 "major": _safe_names(getattr(d, "major_stars", [])),
-            },
+            } if d is not None else None,
             "yearly": {
                 "palace": normalize_palace_name(y.translate_name()),
                 "stem_branch": f"{y.translate_heavenly_stem()}{y.translate_earthly_branch()}",
@@ -390,13 +441,15 @@ def ziwei_block_py(calc_date: str, calc_time: str, gender_cn: str, year: int | N
                 "name": hs.age.name,
                 "palace": normalize_palace_name(a.translate_name()),
                 "stem_branch": f"{a.translate_heavenly_stem()}{a.translate_earthly_branch()}",
-            },
+            } if a is not None else None,
         }
+        if out_of_range:
+            horoscope["out_of_range"] = out_of_range
 
     return {
         "engine": "py",
         "hour_index": idx,
-        "hour_branch": BRANCHES[idx],
+        "hour_branch": BRANCHES[idx % 12],
         "five_elements_class": chart.five_elements_class,
         "ming": ming,
         "body": body,
@@ -445,15 +498,17 @@ def ziwei_block_js(calc_date: str, calc_time: str, gender_cn: str, year: int | N
     if data.get("body"):
         data["body"]["name"] = normalize_palace_name(data["body"]["name"])
     if data.get("horoscope"):
-        data["horoscope"]["decadal"]["palace"] = normalize_palace_name(data["horoscope"]["decadal"]["palace"])
-        data["horoscope"]["yearly"]["palace"] = normalize_palace_name(data["horoscope"]["yearly"]["palace"])
-        data["horoscope"]["age"]["palace"] = normalize_palace_name(data["horoscope"]["age"]["palace"])
-        data["horoscope"]["yearly"]["mutagen"] = normalize_mutagen(data["horoscope"]["yearly"].get("mutagen", []))
-        data["horoscope"]["yearly"]["mutagen_labeled"] = label_mutagen(data["horoscope"]["yearly"].get("mutagen", []))
+        for key in ("decadal", "yearly", "age"):
+            section = data["horoscope"].get(key)
+            if isinstance(section, dict) and section.get("palace"):
+                section["palace"] = normalize_palace_name(section["palace"])
+        yearly = data["horoscope"].get("yearly") or {}
+        yearly["mutagen"] = normalize_mutagen(yearly.get("mutagen", []))
+        yearly["mutagen_labeled"] = label_mutagen(yearly.get("mutagen", []))
 
     data["engine"] = "js"
     data["hour_index"] = idx
-    data["hour_branch"] = BRANCHES[idx]
+    data["hour_branch"] = BRANCHES[idx % 12]
     return data
 
 
@@ -478,7 +533,8 @@ def _core(ziwei: dict[str, Any]) -> dict[str, Any]:
         base["yearly_mutagen_labeled"] = ziwei["horoscope"]["yearly"].get(
             "mutagen_labeled", label_mutagen(ziwei["horoscope"]["yearly"].get("mutagen", []))
         )
-        base["decadal_palace"] = ziwei["horoscope"]["decadal"]["palace"]
+        decadal = ziwei["horoscope"].get("decadal") or {}
+        base["decadal_palace"] = decadal.get("palace")
     return base
 
 
@@ -525,8 +581,8 @@ def interpretation_framework(ziwei: dict[str, Any], target_year: int | None) -> 
     health_major = health.get("major", [])
 
     h = ziwei.get("horoscope") or {}
-    yearly = h.get("yearly", {})
-    decadal = h.get("decadal", {})
+    yearly = h.get("yearly") or {}
+    decadal = h.get("decadal") or {}
     muta = yearly.get("mutagen", [])
 
     year_text = str(target_year) if target_year else "目标年"
@@ -593,7 +649,7 @@ def interpretation_framework(ziwei: dict[str, Any], target_year: int | None) -> 
             "命理研判首先受输入精度约束，时空口径必须先校准。",
             [
                 "时辰跨界会改变命身宫及运限落点。",
-                "默认口径：Asia/Shanghai + 120.0E。",
+                "默认口径：Asia/Shanghai + 东八区中央经线 120.0°E。",
                 "边界时刻建议做多档分钟复盘。",
             ],
             [
@@ -604,13 +660,22 @@ def interpretation_framework(ziwei: dict[str, Any], target_year: int | None) -> 
     }
 
     if h:
+        decadal_signal = (
+            f"大限宫：{decadal['palace']}（{decadal['stem_branch']}）"
+            if decadal else "大限宫：目标年超出该命盘的有效运限"
+        )
+        age = h.get("age") or {}
+        age_signal = (
+            f"岁位：{age['name']} @ {age['palace']}"
+            if age else "岁位：目标年超出该命盘的有效运限"
+        )
         frame["year_focus"] = section(
             f"{h['year']} 年重点在“大限宫-流年宫-四化”三层联动。",
             [
-                f"大限宫：{h['decadal']['palace']}（{h['decadal']['stem_branch']}）",
+                decadal_signal,
                 f"流年宫：{h['yearly']['palace']}（{h['yearly']['stem_branch']}）",
                 f"四化：{format_mutagen(h['yearly']['mutagen']) if h['yearly']['mutagen'] else '无'}",
-                f"岁位：{h['age']['name']} @ {h['age']['palace']}",
+                age_signal,
             ],
             [
                 "流年解读先看宫位主题，再看四化触发对象，最后回归本命结构校验。",
@@ -637,8 +702,10 @@ def render_markdown(payload: dict[str, Any], template: str) -> str:
         "## 0) 排盘口径",
         f"- 输入：{meta['input']['date']} {meta['input']['time']} / {meta['input']['gender_raw']}",
         f"- 时区：{meta['timezone']}（默认东八区）",
-        f"- 经度：{meta['longitude']}°E（120.0 为北京基准）",
-        f"- 统一计算时间：{meta['calc']['date']} {meta['calc']['time']}（经度修正 {meta['calc']['offset_min']} 分钟）",
+        f"- 经度：{meta['longitude']}°E（已启用当地平太阳时修正）"
+        if meta["longitude"] is not None else "- 经度：未提供（按输入区时排盘，不做经度修正）",
+        f"- 统一计算时间：{meta['calc']['date']} {meta['calc']['time']}"
+        f"（{meta['calc']['time_basis']}，经度修正 {meta['calc']['offset_min']} 分钟）",
         f"- 引擎：{payload['engine']['used']}（请求：{payload['engine']['requested']}）",
     ]
 
@@ -660,15 +727,19 @@ def render_markdown(payload: dict[str, Any], template: str) -> str:
 
     if z.get("horoscope"):
         h = z["horoscope"]
+        decadal = h.get("decadal") or {}
+        age = h.get("age") or {}
         lines.extend(
             [
                 f"- 年度锚点：{h['year']} / {h['anchor_date']}",
-                f"- 大限宫：{h['decadal']['palace']}（{h['decadal']['stem_branch']}）",
+                f"- 大限宫：{decadal['palace']}（{decadal['stem_branch']}）" if decadal else "- 大限宫：目标年超出该命盘的有效运限",
                 f"- 流年宫：{h['yearly']['palace']}（{h['yearly']['stem_branch']}）",
-                f"- 岁位：{h['age']['name']} @ {h['age']['palace']}",
+                f"- 岁位：{age['name']} @ {age['palace']}" if age else "- 岁位：目标年超出该命盘的有效运限",
                 f"- 四化：{format_mutagen(h['yearly']['mutagen'])}",
             ]
         )
+        if h.get("out_of_range"):
+            lines.append(f"- 注意：{''.join(h['out_of_range'])}数据超出该命盘的有效运限，未生成宫位。")
 
     lines.extend(["", "## 2) 命宫三方四正"])
     for item in z["ming_context"]["related"]:
@@ -821,8 +892,8 @@ def render_svg(payload: dict[str, Any]) -> str:
         f'<rect class="pat" x="0" y="0" width="{width}" height="{height}"/>',
         f'<rect class="head" x="{gap}" y="{gap}" width="{width - gap * 2}" height="96" rx="18"/>',
         f'<text class="title" x="{gap + 22}" y="{gap + 40}">Ziwei Doushu 紫微斗数排盘</text>',
-        f'<text class="meta" x="{gap + 22}" y="{gap + 64}">{escape(meta["input"]["date"])} {escape(meta["input"]["time"])} / {escape(meta["input"]["gender"])} | 时区 {escape(meta["timezone"])} | 经度 {meta["longitude"]}E</text>',
-        f'<text class="meta" x="{gap + 22}" y="{gap + 84}">统一计算时间 {escape(meta["calc"]["date"])} {escape(meta["calc"]["time"])}（经度修正 {meta["calc"]["offset_min"]} 分钟） | 引擎 {escape(payload["engine"]["used"])}</text>',
+        f'<text class="meta" x="{gap + 22}" y="{gap + 64}">{escape(meta["input"]["date"])} {escape(meta["input"]["time"])} / {escape(meta["input"]["gender"])} | 时区 {escape(meta["timezone"])} | 经度 {meta["longitude"] if meta["longitude"] is not None else "未提供"}</text>',
+        f'<text class="meta" x="{gap + 22}" y="{gap + 84}">统一计算时间 {escape(meta["calc"]["date"])} {escape(meta["calc"]["time"])}（{escape(meta["calc"]["time_basis"])}，经度修正 {meta["calc"]["offset_min"]} 分钟） | 引擎 {escape(payload["engine"]["used"])}</text>',
     ]
 
     for p, (col, row) in zip(z["palaces"], positions):
@@ -963,15 +1034,21 @@ def maybe_generate_chart(
 def build_payload(args: argparse.Namespace) -> dict[str, Any]:
     gender_cn = normalize_gender(args.gender)
 
-    input_local = parse_local_datetime(args.date, args.time, args.timezone)
-    calc_local, offset_min = apply_longitude(input_local, args.longitude)
-    # 晚子时（23:00-23:59）按"子时归次日"流派，排盘日柱推进一天；
-    # 时辰下标仍为子（idx=0），由 shichen_index 保证。
-    if calc_local.hour >= 23:
-        calc_local = calc_local + timedelta(days=1)
+    solar_input_date = solar_date_from_input(
+        args.date, args.time, args.date_type, args.leap_month
+    )
+    input_local = parse_local_datetime(solar_input_date, args.time, args.timezone)
+    if args.longitude is None:
+        calc_local, offset_min = input_local, 0
+        time_basis = "输入区时"
+    else:
+        calc_local, offset_min = apply_longitude(input_local, args.longitude)
+        time_basis = "当地平太阳时"
+    # iztro-py 0.5 的索引 12 表示晚子时，并由引擎按次日口径处理日柱；
+    # 这里必须保留原日历日，避免与引擎的内部进位叠加。
     calc_date = calc_local.strftime("%Y-%m-%d")
     calc_time = calc_local.strftime("%H:%M")
-    birth_mm_dd = args.date[5:]
+    birth_mm_dd = solar_input_date[5:]
 
     ziwei_py = None
     ziwei_js = None
@@ -1040,6 +1117,9 @@ def build_payload(args: argparse.Namespace) -> dict[str, Any]:
         "meta": {
             "input": {
                 "date": args.date,
+                "date_type": args.date_type,
+                "leap_month": args.leap_month,
+                "solar_date": solar_input_date,
                 "time": args.time,
                 "gender": gender_cn,
                 "gender_raw": args.gender,
@@ -1050,12 +1130,12 @@ def build_payload(args: argparse.Namespace) -> dict[str, Any]:
                 "date": calc_date,
                 "time": calc_time,
                 "offset_min": offset_min,
+                "time_basis": time_basis,
             },
             "target_year": args.year,
         },
         "version_requirements": {
-            "iztro-py": ">=0.3.4",
-            "iztro": ">=2.5.7 (js engine)",
+            "iztro-py": ">=0.5.0,<0.6",
         },
         "engine": engine_info,
         "ziwei": ziwei,
@@ -1078,13 +1158,15 @@ def build_payload(args: argparse.Namespace) -> dict[str, Any]:
 
 def main() -> None:
     ap = argparse.ArgumentParser()
-    ap.add_argument("--date", required=True, help="YYYY-MM-DD")
+    ap.add_argument("--date", required=True, help="YYYY-MM-DD；农历输入也按年月日填写")
     ap.add_argument("--time", required=True, help="HH:MM")
     ap.add_argument("--gender", required=True, help="male/female/男/女")
+    ap.add_argument("--date-type", choices=["solar", "lunar"], default="solar")
+    ap.add_argument("--leap-month", action="store_true", help="农历闰月输入时启用")
     ap.add_argument("--timezone", default="Asia/Shanghai", help="IANA 时区，默认 Asia/Shanghai")
-    ap.add_argument("--longitude", type=float, default=120.0, help="出生地经度，默认 120.0（北京基准）")
+    ap.add_argument("--longitude", type=float, help="出生地经度；不提供则按输入区时排盘，提供后才做当地平太阳时修正")
     ap.add_argument("--year", type=int, default=None, help="年度锚点年份")
-    ap.add_argument("--engine", choices=["py", "js", "dual"], default="py")
+    ap.add_argument("--engine", choices=["py"], default="py", help="当前发行包仅支持 Python 引擎")
     ap.add_argument("--template", choices=["lite", "pro", "executive"], default="pro")
     ap.add_argument("--chart", choices=["none", "svg", "jpg"], default="none")
     ap.add_argument("--chart-out", default=None)

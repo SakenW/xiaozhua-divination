@@ -9,4 +9,4 @@ for site_packages in sorted((SKILL_DIR / "scripts" / ".venv" / "lib").glob("pyth
 sys.path.insert(0, str(SKILL_DIR / "liuyao" / "scripts"))
 
 from liuyao_pan import main
-main()
+raise SystemExit(main())

@@ -110,31 +110,39 @@ function main() {
   let horoscope = null;
   if (year && anchorDate) {
     const hs = chart.horoscope(anchorDate);
-    const d = palaceItem(chart.palace(hs.decadal.index), hs.decadal.index);
-    const y = palaceItem(chart.palace(hs.yearly.index), hs.yearly.index);
-    const a = palaceItem(chart.palace(hs.age.index), hs.age.index);
+    const palaceAt = (index) => (Number.isInteger(index) && index >= 0 && index < 12
+      ? palaceItem(chart.palace(index), index)
+      : null);
+    const d = palaceAt(hs.decadal.index);
+    const y = palaceAt(hs.yearly.index);
+    const a = palaceAt(hs.age.index);
+    if (!y) throw new Error('iztro 返回了无效的流年宫位索引');
     const mutagen = normalizeMutagen(hs.yearly.mutagen || []);
+    const outOfRange = [];
+    if (!d) outOfRange.push('大限');
+    if (!a) outOfRange.push('小限');
 
     horoscope = {
       year,
       anchor_date: anchorDate,
-      decadal: {
+      decadal: d ? {
         palace: d.name,
         stem_branch: `${d.stem}${d.branch}`,
         major: d.major,
-      },
+      } : null,
       yearly: {
         palace: y.name,
         stem_branch: `${y.stem}${y.branch}`,
         major: y.major,
         mutagen,
       },
-      age: {
+      age: a ? {
         name: hs.age.name,
         palace: a.name,
         stem_branch: `${a.stem}${a.branch}`,
-      },
+      } : null,
     };
+    if (outOfRange.length) horoscope.out_of_range = outOfRange;
   }
 
   const payload = {

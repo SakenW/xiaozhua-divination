@@ -14,7 +14,18 @@ from lunar_python import Lunar, Solar
 
 DEFAULT_RULESET = "mainline-cn-v1"
 DEFAULT_TIMEZONE = "Asia/Shanghai"
-CHINA_NAMES = {"cn", "china", "中国", "中华人民共和国", ""}
+CHINA_NAMES = {
+    "",
+    "cn",
+    "china",
+    "prc",
+    "mainland",
+    "mainland china",
+    "people's republic of china",
+    "中国",
+    "中国大陆",
+    "中华人民共和国",
+}
 
 JIAZI = [
     "甲子", "乙丑", "丙寅", "丁卯", "戊辰", "己巳", "庚午", "辛未", "壬申", "癸酉",
@@ -127,6 +138,7 @@ class NormalizedInput:
     question_type: str
     question_goal: str
     calendar_type: str
+    ruleset: str
     timezone: str
     country: str
     city: str
@@ -153,15 +165,14 @@ def parse_datetime_string(value: str) -> dict[str, int]:
     date_bits = [int(bit) for bit in date_part.split("-") if bit]
     if len(date_bits) != 3:
         raise ValueError("日期格式需为 YYYY-MM-DD")
-    time_bits = [0, 0, 0]
-    if len(parts) > 1:
-        raw_time = parts[1]
-        tmp = [int(bit) for bit in raw_time.split(":") if bit]
-        if len(tmp) >= 2:
-            time_bits[0] = tmp[0]
-            time_bits[1] = tmp[1]
-        if len(tmp) >= 3:
-            time_bits[2] = tmp[2]
+    if len(parts) != 2:
+        raise ValueError("time_input 必须包含具体时刻，格式为 YYYY-MM-DD HH:MM[:SS]")
+    raw_time = parts[1]
+    raw_time_bits = raw_time.split(":")
+    if len(raw_time_bits) not in {2, 3} or any(not bit for bit in raw_time_bits):
+        raise ValueError("time_input 必须包含小时和分钟，格式为 YYYY-MM-DD HH:MM[:SS]")
+    tmp = [int(bit) for bit in raw_time_bits]
+    time_bits = [tmp[0], tmp[1], tmp[2] if len(tmp) == 3 else 0]
     return {
         "year": date_bits[0],
         "month": date_bits[1],
@@ -172,24 +183,43 @@ def parse_datetime_string(value: str) -> dict[str, int]:
     }
 
 
-def resolve_timezone(location: dict[str, Any], warnings: list[str]) -> str:
-    timezone = (location.get("timezone") or "").strip()
-    if timezone:
-        return timezone
-    country = (location.get("country") or "").strip().lower()
-    city = (location.get("city") or "").strip()
+def resolve_timezone(location: dict[str, Any]) -> str:
+    timezone_name = str(location.get("timezone") or "").strip()
+    if timezone_name:
+        return timezone_name
+    country = str(location.get("country") or "").strip().lower()
     if country in CHINA_NAMES or not country:
         return DEFAULT_TIMEZONE
-    warnings.append(f"未提供海外时区，脚本暂按 {DEFAULT_TIMEZONE} 计算，请在访谈中先补齐时区。")
-    if city:
-        warnings.append(f"已收到海外城市 {city}，但仍缺少明确时区。")
-    return DEFAULT_TIMEZONE
+    raise ValueError("海外正式排盘必须提供 location.timezone，不能按默认时区计算")
+
+
+def require_complete_time_input(value: Any) -> dict[str, Any]:
+    if not isinstance(value, dict):
+        return parse_datetime_string(str(value or ""))
+    required = ("year", "month", "day", "hour", "minute")
+    missing = [key for key in required if key not in value or value[key] is None or value[key] == ""]
+    if missing:
+        raise ValueError(f"time_input 缺少完整具体时刻字段: {', '.join(missing)}")
+    return value
 
 
 def normalize_input(payload: dict[str, Any]) -> NormalizedInput:
     warnings: list[str] = []
+    question_type = str(payload.get("question_type") or "").strip()
+    question_goal = str(payload.get("question_goal") or "").strip()
+    if not question_type:
+        raise ValueError("question_type 不能为空")
+    if not question_goal:
+        raise ValueError("question_goal 不能为空")
+
+    ruleset = str(payload.get("ruleset") or DEFAULT_RULESET).strip()
+    if ruleset != DEFAULT_RULESET:
+        raise ValueError(f"不支持的 ruleset: {ruleset}；正式排盘仅支持 {DEFAULT_RULESET}")
+
     location = payload.get("location") or {}
-    timezone = resolve_timezone(location, warnings)
+    if not isinstance(location, dict):
+        raise ValueError("location 必须是对象")
+    timezone = resolve_timezone(location)
     try:
         tz = get_timezone(timezone)
     except ZoneInfoNotFoundError as exc:
@@ -205,32 +235,34 @@ def normalize_input(payload: dict[str, Any]) -> NormalizedInput:
         use_now = True
     elif calendar_type == "solar":
         use_now = False
+        complete_time_input = require_complete_time_input(original_time_input)
         if isinstance(original_time_input, dict):
             raw = {
-                "year": int(original_time_input["year"]),
-                "month": int(original_time_input["month"]),
-                "day": int(original_time_input["day"]),
-                "hour": int(original_time_input.get("hour", 0)),
-                "minute": int(original_time_input.get("minute", 0)),
-                "second": int(original_time_input.get("second", 0)),
+                "year": int(complete_time_input["year"]),
+                "month": int(complete_time_input["month"]),
+                "day": int(complete_time_input["day"]),
+                "hour": int(complete_time_input["hour"]),
+                "minute": int(complete_time_input["minute"]),
+                "second": int(complete_time_input.get("second", 0)),
             }
         else:
-            raw = parse_datetime_string(str(original_time_input))
+            raw = complete_time_input
         solar_dt = datetime(raw["year"], raw["month"], raw["day"], raw["hour"], raw["minute"], raw["second"], tzinfo=tz)
     elif calendar_type == "lunar":
         use_now = False
+        complete_time_input = require_complete_time_input(original_time_input)
         if isinstance(original_time_input, dict):
             raw = {
-                "year": int(original_time_input["year"]),
-                "month": int(original_time_input["month"]),
-                "day": int(original_time_input["day"]),
-                "hour": int(original_time_input.get("hour", 0)),
-                "minute": int(original_time_input.get("minute", 0)),
-                "second": int(original_time_input.get("second", 0)),
-                "is_leap_month": bool(original_time_input.get("is_leap_month", False)),
+                "year": int(complete_time_input["year"]),
+                "month": int(complete_time_input["month"]),
+                "day": int(complete_time_input["day"]),
+                "hour": int(complete_time_input["hour"]),
+                "minute": int(complete_time_input["minute"]),
+                "second": int(complete_time_input.get("second", 0)),
+                "is_leap_month": bool(complete_time_input.get("is_leap_month", False)),
             }
         else:
-            raw = parse_datetime_string(str(original_time_input))
+            raw = complete_time_input
             raw["is_leap_month"] = bool(payload.get("is_leap_month", False))
         leap_month = bool(raw.get("is_leap_month", False))
         lunar_month = -raw["month"] if leap_month else raw["month"]
@@ -250,9 +282,10 @@ def normalize_input(payload: dict[str, Any]) -> NormalizedInput:
         raise ValueError(f"不支持的 calendar_type: {calendar_type}")
 
     return NormalizedInput(
-        question_type=str(payload.get("question_type") or "").strip(),
-        question_goal=str(payload.get("question_goal") or "").strip(),
+        question_type=question_type,
+        question_goal=question_goal,
         calendar_type=calendar_type,
+        ruleset=ruleset,
         timezone=timezone,
         country=str(location.get("country") or "").strip(),
         city=str(location.get("city") or "").strip(),
@@ -291,27 +324,9 @@ def active_jie(lunar: Any) -> tuple[str, Any, Any]:
 
 
 def compute_yuan(day_ganzhi: str) -> str:
-    """按"符头法"判定三元（标准奇门定元规则）。
-
-    每个节气分上中下三元，每元5日；元由日柱所在"六甲旬"的旬首属性决定：
-    - 四仲符头（甲子、甲午） → 上元
-    - 四孟符头（甲申、甲寅） → 中元
-    - 四季符头（甲戌、甲辰） → 下元
-
-    注意：旧实现用 `idx // 5 % 3`，对每旬首日（甲X）正确，但对每旬第6~10日
-    （癸X 等）会算错——例如癸酉（甲子旬）应为上元，旧算法返回中元。
-    """
+    """按六十甲子序列每五日一元，以上元、中元、下元循环判定。"""
     idx = JIAZI.index(day_ganzhi)
-    xunshou_idx = (idx // 10) * 10  # 0/10/20/30/40/50，对应六甲旬首
-    xunshou_to_yuan = {
-        0: "上元",   # 甲子（子=四仲）
-        10: "下元",  # 甲戌（戌=四季）
-        20: "中元",  # 甲申（申=四孟）
-        30: "上元",  # 甲午（午=四仲）
-        40: "下元",  # 甲辰（辰=四季）
-        50: "中元",  # 甲寅（寅=四孟）
-    }
-    return xunshou_to_yuan[xunshou_idx]
+    return ("上元", "中元", "下元")[(idx // 5) % 3]
 
 
 def compute_earth_plate(dun_type: str, ju_number: int) -> dict[int, str]:
@@ -452,7 +467,7 @@ def build_output(payload: dict[str, Any]) -> dict[str, Any]:
             "question_type": normalized.question_type,
             "question_goal": normalized.question_goal,
             "calendar_type": normalized.calendar_type,
-            "ruleset": str(payload.get("ruleset") or DEFAULT_RULESET),
+            "ruleset": normalized.ruleset,
             "timezone": normalized.timezone,
             "country": normalized.country,
             "city": normalized.city,
@@ -490,11 +505,13 @@ def build_output(payload: dict[str, Any]) -> dict[str, Any]:
             "time_xunkong": lunar.getTimeXunKong(),
         },
         "ruleset": {
-            "id": str(payload.get("ruleset") or DEFAULT_RULESET),
+            "id": normalized.ruleset,
             "name": "时家转盘奇门（大陆默认）",
             "timezone_default": DEFAULT_TIMEZONE,
+            "direction_frame": "later-heaven-trigram-symbolic-sectors",
+            "direction_frame_note": "东西南北为后天八卦符号方位扇区，未按当地磁北、真北、建筑坐向或导航路线校准。",
             "dun_type_rule": "冬至到芒种用阳遁，夏至到大雪用阴遁，按当前节令判定。",
-            "yuan_rule": "符头定元法：按日柱所在六甲旬的旬首（甲X）地支属性判定整个旬的元归属——四仲符头（甲子/甲午）→上元，四孟符头（甲申/甲寅）→中元，四季符头（甲戌/甲辰）→下元。一个六甲旬（10日）内所有日期归同一元。",
+            "yuan_rule": "按六十甲子序列每五日一元：甲子至戊辰为上元、己巳至癸酉为中元、甲戌至戊寅为下元，随后按上元、中元、下元循环。",
             "ju_rule": "按当前节令和三元，从固定定局表取局数。",
             "center_hosting_rule": "中宫相关判断一律寄坤处理。",
         },
